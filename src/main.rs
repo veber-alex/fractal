@@ -34,10 +34,10 @@ fn main() {
 
 fn render_line(rng: &mut ThreadRng, line_number: u32, px: f64, py: f64) -> Vec<u8> {
     let line_size = WIDTH * 3;
-    let mut line: Vec<u8> = vec![0; line_size as usize];
+    let mut line: Vec<u8> = Vec::with_capacity(line_size as usize);
 
     for x in 0..WIDTH {
-        let (r, g, b) = (0..NB_SAMPLES)
+        let pixel = (0..NB_SAMPLES)
             .map(|_| {
                 let nx = SIZE * (((x as f64) + rng.gen_range(0., 1.0)) / (WIDTH as f64)) + px;
                 let ny =
@@ -45,13 +45,18 @@ fn render_line(rng: &mut ThreadRng, line_number: u32, px: f64, py: f64) -> Vec<u
                 let (m_res, m_iter) = mandelbrot_iter(nx, ny);
                 paint(m_res, m_iter)
             })
-            .fold((0, 0, 0), |acc, x| {
-                (acc.0 + x.0 as i32, acc.1 + x.1 as i32, acc.2 + x.2 as i32)
+            .fold([0, 0, 0], |acc, x| {
+                [
+                    acc[0] + x.0 as i32,
+                    acc[1] + x.1 as i32,
+                    acc[2] + x.2 as i32,
+                ]
             });
 
-        line[(x * 3) as usize] = ((r as f64) / (NB_SAMPLES as f64)) as u8;
-        line[((x * 3) + 1) as usize] = ((g as f64) / (NB_SAMPLES as f64)) as u8;
-        line[((x * 3) + 2) as usize] = ((b as f64) / (NB_SAMPLES as f64)) as u8;
+        let pixel = pixel
+            .iter()
+            .map(|&p| ((p as f64) / (NB_SAMPLES as f64)) as u8);
+        line.extend(pixel);
     }
 
     line
