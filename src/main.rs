@@ -2,61 +2,37 @@
 
 mod color;
 
-use rand::{thread_rng, Rng};
-use tokio::sync::mpsc;
+use rand::{prelude::ThreadRng, thread_rng, Rng};
+use rayon::prelude::*;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 const WIDTH: u32 = 1024;
 const HEIGHT: u32 = 1024;
-const BUF_SIZE: u32 = WIDTH * HEIGHT * 3;
 const NB_SAMPLES: u32 = 50;
 const SIZE: f64 = 0.000000001;
 const MAX_ITER: u32 = 1000;
 
-#[tokio::main]
-async fn main() {
-    let blocking_task = tokio::spawn(async {
-        let px: f64 = -0.5557506;
-        let py: f64 = -0.55560;
-        let mut buf: Vec<u8> = vec![0; BUF_SIZE as usize];
+fn main() {
+    let px: f64 = -0.5557506;
+    let py: f64 = -0.55560;
 
-        let (tx, mut rx) = mpsc::channel(100);
+    let finished = AtomicU32::new(0);
 
-        for y in 0..HEIGHT {
-            let tx = tx.clone();
-            tokio::spawn(async move {
-                let (line, line_number) = render_line(y, px, py);
-                tx.send((line, line_number)).await.unwrap();
-            });
-        }
-
-        drop(tx);
-
-        let mut finished: f64 = 0.;
-        while let Some(res) = rx.recv().await {
-            finished += 1.;
-            let percentage_finished = (finished / (HEIGHT as f64)) * 100.;
+    let buf: Vec<_> = (0..HEIGHT)
+        .into_par_iter()
+        .map_init(thread_rng, |rng, y| render_line(rng, y, px, py))
+        .inspect(|_| {
+            let done = finished.fetch_add(1, Ordering::Relaxed);
+            let percentage_finished = (done + 1) as f64 / (HEIGHT as f64) * 100.;
             print!("Progress: {}%\r", percentage_finished as u32);
+        })
+        .flatten()
+        .collect();
 
-            let (line, line_number) = res;
-            write_line(&mut buf, &line, line_number);
-        }
-        image::save_buffer("fractal.png", &buf, WIDTH, HEIGHT, image::ColorType::Rgb8).unwrap();
-    });
-
-    blocking_task.await.unwrap();
+    image::save_buffer("fractal.png", &buf, WIDTH, HEIGHT, image::ColorType::Rgb8).unwrap();
 }
 
-fn write_line(buf: &mut Vec<u8>, line: &[u8], line_number: u32) {
-    for i in 0..WIDTH {
-        buf[(((line_number * WIDTH) + i) * 3) as usize] = line[(i * 3) as usize];
-        buf[((((line_number * WIDTH) + i) * 3) + 1) as usize] = line[((i * 3) + 1) as usize];
-        buf[((((line_number * WIDTH) + i) * 3) + 2) as usize] = line[((i * 3) + 2) as usize];
-    }
-}
-
-fn render_line(line_number: u32, px: f64, py: f64) -> (Vec<u8>, u32) {
-    let mut rng = thread_rng();
-
+fn render_line(rng: &mut ThreadRng, line_number: u32, px: f64, py: f64) -> Vec<u8> {
     let line_size = WIDTH * 3;
     let mut line: Vec<u8> = vec![0; line_size as usize];
 
@@ -78,7 +54,7 @@ fn render_line(line_number: u32, px: f64, py: f64) -> (Vec<u8>, u32) {
         line[((x * 3) + 2) as usize] = ((b as f64) / (NB_SAMPLES as f64)) as u8;
     }
 
-    (line, line_number)
+    line
 }
 
 fn paint(r: f64, n: u32) -> (u8, u8, u8) {
