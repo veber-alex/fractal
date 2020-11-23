@@ -1,6 +1,7 @@
+#![allow(clippy::many_single_char_names)]
+
 mod color;
 
-use image;
 use rand::{thread_rng, Rng};
 use tokio::sync::mpsc;
 
@@ -16,8 +17,7 @@ async fn main() {
     let blocking_task = tokio::spawn(async {
         let px: f64 = -0.5557506;
         let py: f64 = -0.55560;
-        let mut buf: Vec<u8> = Vec::with_capacity(BUF_SIZE as usize);
-        buf.resize(BUF_SIZE as usize, 0);
+        let mut buf: Vec<u8> = vec![0; BUF_SIZE as usize];
 
         let (tx, mut rx) = mpsc::channel(100);
 
@@ -46,7 +46,7 @@ async fn main() {
     blocking_task.await.unwrap();
 }
 
-fn write_line(buf: &mut Vec<u8>, line: &Vec<u8>, line_number: u32) {
+fn write_line(buf: &mut Vec<u8>, line: &[u8], line_number: u32) {
     for i in 0..WIDTH {
         buf[(((line_number * WIDTH) + i) * 3) as usize] = line[(i * 3) as usize];
         buf[((((line_number * WIDTH) + i) * 3) + 1) as usize] = line[((i * 3) + 1) as usize];
@@ -58,13 +58,11 @@ fn render_line(line_number: u32, px: f64, py: f64) -> (Vec<u8>, u32) {
     let mut rng = thread_rng();
 
     let line_size = WIDTH * 3;
-    let mut line: Vec<u8> = Vec::with_capacity(line_size as usize);
-    line.resize(line_size as usize, 0);
+    let mut line: Vec<u8> = vec![0; line_size as usize];
 
     for x in 0..WIDTH {
         let sampled_size = NB_SAMPLES * 3;
-        let mut sampled_colours: Vec<u8> = Vec::with_capacity(sampled_size as usize);
-        sampled_colours.resize(sampled_size as usize, 0);
+        let mut sampled_colours: Vec<u8> = vec![0; sampled_size as usize];
 
         for i in 0..NB_SAMPLES {
             let nx = SIZE * (((x as f64) + rng.gen_range(0., 1.0)) / (WIDTH as f64)) + px;
@@ -91,14 +89,14 @@ fn render_line(line_number: u32, px: f64, py: f64) -> (Vec<u8>, u32) {
         line[((x * 3) + 2) as usize] = ((b as f64) / (NB_SAMPLES as f64)) as u8;
     }
 
-    return (line, line_number);
+    (line, line_number)
 }
 
 fn paint(r: f64, n: u32) -> (u8, u8, u8) {
     if r > 4. {
-        return color::hsl_to_rgb(n as f64 / 800. * r, 1., 0.5);
+        color::hsl_to_rgb(n as f64 / 800. * r, 1., 0.5)
     } else {
-        return (255, 255, 255);
+        (255, 255, 255)
     }
 }
 
@@ -117,5 +115,5 @@ fn mandelbrot_iter(px: f64, py: f64) -> (f64, u32) {
         y = 2. * xy + py;
     }
 
-    return (xx + yy, MAX_ITER);
+    (xx + yy, MAX_ITER)
 }
